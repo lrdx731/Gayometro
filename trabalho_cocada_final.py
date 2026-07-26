@@ -18,6 +18,7 @@ from kagglehub import KaggleDatasetAdapter
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
 
 # Configuração da página do Streamlit
 st.set_page_config(page_title="Gayômetro - Clusterização Spotify", page_icon="🎵", layout="centered")
@@ -99,7 +100,12 @@ medias_dos_albuns = df_filtrado[['album_name'] + colunas_matematicas].groupby('a
 '''Ajuste de escala e treinamento do K-Means'''
 scaler = StandardScaler()
 dados_nivelados = scaler.fit_transform(medias_dos_albuns)
-df_nivelado = pd.DataFrame(dados_nivelados, columns=medias_dos_albuns.columns, index=medias_dos_albuns.index)
+# Reduzindo de R5 para R2
+pca = PCA(n_components=2, random_state=42)
+dados_pca = pca.fit_transform(dados_nivelados)
+
+# Agora o dataframe só tem 2 colunas!
+df_nivelado = pd.DataFrame(dados_pca, columns=['PC1', 'PC2'], index=medias_dos_albuns.index)
 
 kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)
 clusters_gerados = kmeans.fit_predict(df_nivelado)
@@ -140,7 +146,14 @@ if st.button("Executar Predict"):
         medias_teste = df_teste[colunas_matematicas].mean().to_frame().T
         medias_teste.index = [df_teste['album_name'].iloc[0]]
         
-        dados_teste_nivelados = scaler.transform(medias_teste)
+        # 1. Ajusta a escala
+        dados_brutos = scaler.transform(medias_teste)
+        
+        # 2. Transforma de R5 para R2 usando a mesma "lanterna" do PCA
+        dados_pca_teste = pca.transform(dados_brutos)
+        
+        # 3. Alimenta o KMeans com o vetor 2D
+        dados_teste_nivelados = pd.DataFrame(dados_pca_teste, columns=['PC1', 'PC2'])
         resultado_cluster = kmeans.predict(dados_teste_nivelados)[0]
         nome_confirmado = medias_teste.index[0]
         
